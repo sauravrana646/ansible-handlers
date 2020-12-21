@@ -1,0 +1,44 @@
+- hosts : localhost
+  vars : 
+    - document_root : /new_doc_root
+  tasks :
+    - name : Install httpd
+      package : 
+        name : httpd
+        state : present 
+    - name : Create a Doc root Directory
+      file : 
+        path : "{{document_root}}"
+        state : directory
+        setype : httpd_sys_content_t
+    - name : Change conf files to add new doc root
+      blockinfile :  
+        block : "Listen 9020\n\n<VirtualHost *:9020>\n\tDocumentRoot {{document_root}}\n</VirtualHost>"
+        path : /etc/httpd/conf.d/new_root.conf
+        setype : httpd_config_t
+        create : yes
+      notify : 
+        - restart_httpd
+    - name : Allow port through firewall
+      firewalld : 
+        port : 9020/tcp
+        zone : public
+        permanent : true
+        immediate : true
+        state : enabled
+    - name : Allow selinux for httpd port
+      seport : 
+        ports : 9020
+        proto : tcp
+        setype : http_port_t
+        state : present
+    - name : Start Services
+      service : 
+        name : httpd
+        state : started
+
+  handlers : 
+    - name : restart_httpd
+      service : 
+        name : httpd
+        state : restarted
